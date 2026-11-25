@@ -923,7 +923,7 @@ html[dir=rtl] .og-t b{font-family:'Amiri',serif}
 .bestfor span.best{background:#211710;color:#f3e2c4;border-color:#211710}
 /* best for tiles (product page) */
 .bf-title{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#4a3c2e;margin:4px 0 10px}
-.bf-tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:0 0 22px}
+.bf-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-width:340px;gap:8px;margin:0 0 22px}
 .bf-tiles div{border:1.5px solid #e6d6c1;border-radius:14px;padding:11px 4px;text-align:center;font-size:11.5px;font-weight:600;color:#9b8b78;background:#fff}
 .bf-tiles div b{display:block;font-size:22px;margin-bottom:4px;font-weight:400}
 .bf-tiles small{display:block;font-weight:500;font-size:10px;margin-top:2px}
@@ -942,8 +942,6 @@ html[dir=rtl] .og-t b{font-family:'Amiri',serif}
  .og-flag{width:24px;height:24px}.og-t b{font-size:19px}.og-t small{font-size:11px}.og-ct{font-size:11px}
  .bestfor span{font-size:9px;padding:3px 7px}
  .bestfor span:nth-child(n+3){display:none}
- .bf-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
- .bf-tiles .no{display:none}
 }
 /* gift mode: To · message · From + live card */
 .gift-mode .gm-body{margin-top:12px}
@@ -1144,7 +1142,7 @@ html[dir=rtl] .gc-to,html[dir=rtl] .gc-m,html[dir=rtl] .gc-fr{font-family:'Amiri
 var LOW_STOCK=5;
 // Free gift: an order of at least GIFT_MIN (goods, after any discount) gets one free 200g/250g coffee.
 // Set in Admin → Store Content → Free gift. 0 = switched off.
-var GIFT_MIN=0, GIFT_SIZES=["g200","g250"], giftChoice=null, QUIZ_ON=true, BREW_F=null, ORIG_F=null;
+var GIFT_MIN=0, GIFT_SIZES=["g200","g250"], giftChoice=null, QUIZ_ON=true, BREW_F=null, ORIG_F=null, ORIGIN_ON=true, ORIGIN_ORDER=[], ORIGIN_LINES={};
 try{giftChoice=JSON.parse(sessionStorage.getItem("ambrosia_gift")||"null")}catch(e){giftChoice=null}
 var DELIVERY_CHARGE=30; // replaced by settings.deliveryCharge from the admin
 var SPEC_KEYS={origin:"Origin",region:"Region",country:"Country",variety:"Variety",varietal:"Varietal",varieties:"Varieties",process:"Process",processing:"Process",altitude:"Altitude",elevation:"Elevation",grade:"Grade",score:"Score","sca score":"SCA Score",producer:"Producer",farm:"Farm",harvest:"Harvest",roast:"Roast","roast level":"Roast Level"};
@@ -1203,6 +1201,8 @@ function applySettings(s){
  if(!s)return;
  {let dc=Number(s.deliveryCharge);if(s.deliveryCharge!==undefined&&s.deliveryCharge!==""&&isFinite(dc)&&dc>=0&&dc<=500&&dc!==DELIVERY_CHARGE){DELIVERY_CHARGE=Math.round(dc*100)/100;try{updateDeliveryTexts()}catch(e){}}}
  CARD_PAY=String(s.cardpay||"off");try{updatePayOptions()}catch(e){}
+ {let on=String(s.originGroups||"on")!=="off",ord=String(s.originOrder||"").split("|").map(x=>x.trim()).filter(Boolean),ln={};try{let o=JSON.parse(s.originLines||"{}");if(o&&typeof o==="object")ln=o}catch(e){}
+  if(on!==ORIGIN_ON||ord.join("|")!==ORIGIN_ORDER.join("|")||JSON.stringify(ln)!==JSON.stringify(ORIGIN_LINES)){ORIGIN_ON=on;ORIGIN_ORDER=ord;ORIGIN_LINES=ln;try{renderProducts()}catch(e){}}}
  {let g=Number(s.giftMin);let ng=(isFinite(g)&&g>0&&g<10000)?Math.round(g*100)/100:0;let nq=String(s.quiz||"on")!=="off";
   if(ng!==GIFT_MIN||nq!==QUIZ_ON){GIFT_MIN=ng;QUIZ_ON=nq;try{renderCart();renderQuiz();let co=document.getElementById("checkoutOverlay");if(co&&co.style.display==="block"&&document.getElementById("checkoutSummary"))renderCheckout()}catch(e){}}}
  {let raw=s;s=Object.assign({},raw);if(isAr())Object.keys(AR_SETTINGS).forEach(k=>s[k]=pickSetting(raw,k));}
@@ -1713,7 +1713,7 @@ function lotInfo(p){let lot=Math.floor(Number(p.lotSize)||0);if(lot<1)return nul
 function lotHTML(p,big){let l=lotInfo(p);if(!l||l.left<1)return "";let pct=Math.max(4,Math.round(l.left/l.lot*100));return `<div class="lot"><div class="lot-t"><span>${esc(t("Only {n} bags roasted",{n:l.lot}))}</span><em>${esc(t("{n} left",{n:l.left}))}</em></div><div class="lot-bar"><i style="width:${pct}%"></i></div>${big?`<small>${esc(t("Small lot · when it's gone, it's gone"))}</small>`:""}</div>`}
 // ---- Best for: how each coffee is best brewed (Admin → product → Best for) ----
 // p.brew = {espresso:2, filter:1, ...}  2 = ★ our pick · 1 = good · empty = not shown
-const BREWS=[["espresso","Espresso","☕"],["filter","Filter / V60","🫖"],["milk","With milk","🥛"],["press","French press","🫙"],["cold","Cold brew","🧊"]];
+const BREWS=[["espresso","Espresso","☕"],["filter","Filter / V60","🫖"]];
 const BREW_SHORT={espresso:"Espresso",filter:"Filter",milk:"Milk",press:"French press",cold:"Cold brew"};
 const BREW_EMO={espresso:"☕",filter:"🫖",milk:"🥛",press:"🫙",cold:"🧊"};
 function brewLvl(p,k){let v=Math.round(Number(p&&p.brew&&p.brew[k])||0);return v===1||v===2?v:0}
@@ -1750,8 +1750,7 @@ function renderShopTabs(base){
  if(ORIG_F&&!origins.includes(ORIG_F))ORIG_F=null;
  let pill=(on,click,inner)=>`<button type="button" class="sp${on?" on":""}" onclick="${click}">${inner}</button>`;
  let html="";
- if(brews.length)html+=`<div class="sp-row"><span class="sp-lab">${esc(t("How you brew"))}</span><div class="sp-list">${pill(!BREW_F,"setBrewFilter('')",esc(t("All")))}${brews.map(([k,l,e])=>pill(BREW_F===k,`setBrewFilter('${k}')`,`${e} ${esc(t(l))} <em>${base.filter(p=>brewLvl(p,k)).length}</em>`)).join("")}</div></div>`;
- if(origins.length>1)html+=`<div class="sp-row"><span class="sp-lab">${esc(t("Origin"))}</span><div class="sp-list">${pill(!ORIG_F,"setOriginFilter('')",esc(t("All")))}${origins.map(c=>pill(ORIG_F===c,`setOriginFilter('${esc(c).replace(/'/g,"\\'")}')`,`${flagHTML(c,"sp-flag")}${esc(t(c))} <em>${base.filter(p=>productCountry(p)===c).length}</em>`)).join("")}</div></div>`;
+ if(false&&brews.length)html+=`<div class="sp-row"><span class="sp-lab">${esc(t("How you brew"))}</span><div class="sp-list">${pill(!BREW_F,"setBrewFilter('')",esc(t("All")))}${brews.map(([k,l,e])=>pill(BREW_F===k,`setBrewFilter('${k}')`,`${e} ${esc(t(l))} <em>${base.filter(p=>brewLvl(p,k)).length}</em>`)).join("")}</div></div>`;
  el.innerHTML=html;el.style.display=html?"":"none";
 }
 function sortForBrew(list){if(!BREW_F)return list;return list.slice().sort((a,b)=>brewLvl(b,BREW_F)-brewLvl(a,BREW_F))}
@@ -1759,10 +1758,10 @@ function renderProducts(){let grid=document.getElementById("productsGrid")||docu
  let list=base.filter(p=>(!BREW_F||brewLvl(p,BREW_F))&&(!ORIG_F||productCountry(p)===ORIG_F));
  if(!list.length){grid.classList.remove("grouped");grid.innerHTML=`<div class="shop-empty">${esc(t("No coffees match this yet."))} <button type="button" onclick="clearShopFilters()">${esc(t("Show all coffees"))}</button></div>`;return}
  let groups=[];list.forEach(p=>{let c=productCountry(p)||"";let g=groups.find(x=>x.c===c);if(!g)groups.push(g={c,items:[]});g.items.push(p)});
- if(activeStoreFilter||groups.length<2&&!groups[0].c){grid.classList.remove("grouped");grid.innerHTML=sortForBrew(list).map(productCardHTML).join("");return}
- groups.sort((a,b)=>(a.c?0:1)-(b.c?0:1));
+ if(!ORIGIN_ON||activeStoreFilter||groups.length<2&&!groups[0].c){grid.classList.remove("grouped");grid.innerHTML=sortForBrew(list).map(productCardHTML).join("");return}
+ let oi=c=>{if(!c)return 1000;let k=ORIGIN_ORDER.indexOf(c);return k<0?500:k};groups.forEach((g,n)=>g.n=n);groups.sort((a,b)=>oi(a.c)-oi(b.c)||a.n-b.n);
  grid.classList.add("grouped");
- grid.innerHTML=groups.map(g=>{let taste=ORIGIN_TASTE[g.c.toLowerCase()];let n=g.items.length;return `<div class="og"><div class="og-h">${flagHTML(g.c,"og-flag")}<div class="og-t"><b>${esc(g.c?t(g.c):t("More coffees"))}</b>${taste?`<small>${esc(t(taste))}</small>`:""}</div><span class="og-ct">${esc(n===1?t("1 coffee"):t("{n} coffees",{n}))}</span></div><div class="og-row grid">${sortForBrew(g.items).map(productCardHTML).join("")}</div></div>`}).join("");
+ grid.innerHTML=groups.map(g=>{let ol=ORIGIN_LINES[g.c]||{};let taste=(window.LANG==="ar"&&ol.ar)?ol.ar:(ol.en||ORIGIN_TASTE[g.c.toLowerCase()]);let n=g.items.length;return `<div class="og"><div class="og-h">${flagHTML(g.c,"og-flag")}<div class="og-t"><b>${esc(g.c?t(g.c):t("More coffees"))}</b>${taste?`<small>${esc(t(taste))}</small>`:""}</div><span class="og-ct">${esc(n===1?t("1 coffee"):t("{n} coffees",{n}))}</span></div><div class="og-row grid">${sortForBrew(g.items).map(productCardHTML).join("")}</div></div>`}).join("");
 }
 function renderStoreFilterBar(){
  let bar=document.getElementById("storeFilterBar");if(!bar)return;
@@ -2161,7 +2160,7 @@ function quizScore(p,a){
  if(a.taste==="trop")sc+=sw*.9;
  if(a.milk==="milk")sc+=bo*.8-ac*.3;else sc+=ac*.4;
  if(a.brew==="espresso")sc+=bo*.5;else if(a.brew==="filter")sc+=ac*.6;else sc+=bo*.4;
- if(hasBrew(p)){let bl=brewLvl(p,a.brew);sc+=bl?bl*4:-12;if(a.brew==="press"&&!brewLvl(p,"press"))sc+=brewLvl(p,"espresso")*.8;if(a.milk==="milk")sc+=brewLvl(p,"milk")*1.6}
+ if(hasBrew(p)){let bl=brewLvl(p,a.brew==="press"?"espresso":a.brew);sc+=bl?bl*(a.brew==="press"?3:4):-12;if(a.milk==="milk")sc+=brewLvl(p,"milk")*1.6}
  if(String(p.badge||"").toUpperCase().includes("BEST"))sc+=.5;
  return sc;
 }
