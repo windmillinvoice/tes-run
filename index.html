@@ -1201,6 +1201,7 @@ function applySettings(s){
  if(!s)return;
  {let dc=Number(s.deliveryCharge);if(s.deliveryCharge!==undefined&&s.deliveryCharge!==""&&isFinite(dc)&&dc>=0&&dc<=500&&dc!==DELIVERY_CHARGE){DELIVERY_CHARGE=Math.round(dc*100)/100;try{updateDeliveryTexts()}catch(e){}}}
  CARD_PAY=String(s.cardpay||"off");try{updatePayOptions()}catch(e){}
+ try{applyHomeOrder(s.homeOrder)}catch(e){}
  {let on=String(s.originGroups||"on")!=="off",ord=String(s.originOrder||"").split("|").map(x=>x.trim()).filter(Boolean),ln={};try{let o=JSON.parse(s.originLines||"{}");if(o&&typeof o==="object")ln=o}catch(e){}
   if(on!==ORIGIN_ON||ord.join("|")!==ORIGIN_ORDER.join("|")||JSON.stringify(ln)!==JSON.stringify(ORIGIN_LINES)){ORIGIN_ON=on;ORIGIN_ORDER=ord;ORIGIN_LINES=ln;try{renderProducts()}catch(e){}}}
  {let g=Number(s.giftMin);let ng=(isFinite(g)&&g>0&&g<10000)?Math.round(g*100)/100:0;let nq=String(s.quiz||"on")!=="off";
@@ -1688,6 +1689,16 @@ function formatBrew(text){
 }
 // Country + process for the small line above the card name: "COLOMBIA · FRUIT CO-FERMENT"
 function shortProcess(x){x=String(x||"").trim();if(/co-?\s?ferment\w*\s+with\s+fruit/i.test(x))return "Fruit Co-ferment";if(/co-?\s?ferment/i.test(x))return "Co-ferment";return x}
+// ---- Home page order: admin chooses which section comes first ----
+const HOME_SECTIONS={features:"section.features",collections:"#collections",store:"#store","best-sellers":"#best-sellers","new-arrivals":"#new-arrivals",help:"#help-cta"};
+let HOME_ORDER_NOW="";
+function applyHomeOrder(raw){let want=String(raw||"").split("|").map(x=>x.trim()).filter(k=>HOME_SECTIONS[k]);if(!want.length)return;
+ Object.keys(HOME_SECTIONS).forEach(k=>{if(!want.includes(k))want.push(k)});let key=want.join("|");if(key===HOME_ORDER_NOW)return;
+ let els=want.map(k=>document.querySelector(HOME_SECTIONS[k])).filter(Boolean);if(els.length<2)return;
+ let flow=document.getElementById("homeFlow");
+ if(!flow){flow=document.createElement("div");flow.id="homeFlow";flow.style.display="contents";let first=document.querySelector("section.features")||els[0];first.parentNode.insertBefore(flow,first)}
+ els.forEach(el=>flow.appendChild(el));HOME_ORDER_NOW=key}
+window.applyHomeOrder=applyHomeOrder;
 function productCountry(p){let o=specOf(p,"Origin")||specOf(p,"Country")||p.origin||"";let parts=o.split(",").map(x=>x.trim()).filter(Boolean);return parts.length?parts[parts.length-1]:""}
 function cardOriginHTML(p){let c=productCountry(p),pr=shortProcess(specOf(p,"Process"));return `<div class="card-origin">${esc(t(c))}${c&&pr?" · ":""}${pr?`<span class="co-proc">${esc(pr)}</span>`:""}</div>`}
 // Lowest stock among sizes that are still available and running low.
@@ -2886,5 +2897,17 @@ body.layer-lock header{z-index:1!important}
  }catch(e){}
 })();
 </script>
+<style id="coll-stack-2026-11">
+@media (max-width:760px){
+ html body .collection-grid{display:grid!important;grid-template-columns:1fr!important;overflow:visible!important;scroll-snap-type:none!important;gap:18px!important;margin:0!important;padding:0!important}
+ html body .collection-item{flex:none!important;width:100%!important}
+ html body .collection-card{aspect-ratio:16/9!important}
+ html body .coll-cap{padding:34px 16px 14px!important}
+ html body .coll-cap b{font-size:17px!important;letter-spacing:2.4px!important}
+ html body .coll-cap i{font-size:12px!important}
+ html body .coll-cap u s{font-size:8.5px!important;padding:4px 8px!important}
+ html body .collection-name{font-size:16px!important;margin-top:9px!important}
+}
+</style>
 </body>
 </html>
